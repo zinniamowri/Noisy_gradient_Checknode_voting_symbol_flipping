@@ -6,7 +6,6 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
     seqgf= hard_d_gf16;
     d_dec_f =hard_d_cmplx;
 	l = 0;
-    %nse_std2 = (nse_std^2)/2; %used as scaling factor
     
     d_gf16 = hard_d_gf16;
 
@@ -59,63 +58,61 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
           WSH = w*Sb*Hb;
 
           %No=2*sigma^2, total noise variance in QAM16
-          %(-abs(y - d_dec_f).^2/2*sigma^2), this part comes from the log
-          %of PDF of QAM16, which relates to LLR equation
           
 
-
-          E = (-abs(y - d_dec_f).^2/No) + WSH + nse_std*randn(1,N); %old
-
-          %E = (-abs(y - d_dec_f).^2/No) + WSH + randn(1,N);
+          E = (-abs(y - d_dec_f).^2/No) + WSH + nse_std*randn(1,N);
 
 
           % Select most unreliable symbols, by given number flip_num
           [~, idx] = mink(E, flip_num);
 
-          temp_gf16 = d_gf16;
-
-          
+          temp_gf16 = d_gf16; 
 
           for jj = 1:length(idx)
                 v = idx(jj);
             
                 % votes from unsatisfied neighboring checks
-                cn_list = VN_to_CN{v};
+                cn_list = VN_to_CN{v}; %Find neighboring check nodes of variable node v
                 votes = [];
             
+                %Only unsatisfied checks are allowed to vote
                 for t = 1:length(cn_list)
                     i = cn_list(t);
             
                     if S(i) == 0
                         continue; % satisfied check gives no useful vote
                     end
+
+                    %Compute what symbol v should be to satisfy check i
             
-                    % compute RHS = sum_{k in N(i)\v} h(i,k)*x(k)
-                    rhs = 0;
-                    vlist = CN_lst{i};
+                    % compute partial parity sum = sum_{k in N(i)\v} h(i,k)*x(k)
+                    partial_sum = 0; 
+                    vlist = CN_lst{i}; %all variable nodes attached to check i
             
                     for u = 1:length(vlist)
                         k = vlist(u);
                         if k == v
-                            continue;
+                            continue; %skip the symbol we are trying to solve for
                         end
             
-                        hik = double(h(i,k));          % 0..15
-                        xk  = double(temp_gf16(k));    % 0..15
+                        hik = double(h(i,k));          % get the GF coefficient on edge (i,k)
+                        xk  = double(temp_gf16(k));    % get current GF symbol at position k
             
-                        term = gf_mul(hik, xk);
-                        rhs  = gf_add(rhs, term);
+                        term = gf_mul(hik, xk);        %compute hik and sk in GF(16)
+                        partial_sum  = gf_add(partial_sum, term);      %accumulate the sum in GF(16)
                     end
+
+                    %Solve for the symbol vote
+                    %computes the symbol value that check i wants at position v
             
-                    hiv = double(h(i,v));  % nonzero for an edge
-                    vote_sym = gf_div(rhs, hiv);   % 0..15
+                    hiv = double(h(i,v));  % coefficient for the edge between check i and variable v
+                    vote_sym = gf_div(partial_sum, hiv);   % the symbol value that would make check i satisfied,
+                                                   % assuming all the other neighboring symbols stay fixed.
             
                     votes(end+1) = vote_sym;
                 end
             
                 if isempty(votes)
-                    % fallback: keep current symbol OR use old nearest-neighbor random rule
-                    % temp_gf16(v) = temp_gf16(v);
                     continue;
                 end
             
@@ -135,7 +132,7 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
                     chosen_sym = tied_syms(1);
                     for q = 1:numel(tied_syms)
                         s = tied_syms(q);
-                        qam_idx = gf_to_idx(s + 1);   % 1..16
+                        qam_idx = gf_to_idx(s + 1);   
                         d = abs(y(v) - qam16(qam_idx))^2;
                         if d < bestd
                             bestd = d;
@@ -144,7 +141,7 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
                     end
                 end
 
-                % assign chosen symbol (convert 0..15 -> gf element via gf16 table)
+                % assign chosen symbol (convert gf element via gf16 table)
                 temp_gf16(v) = gf16(gf_to_idx(chosen_sym + 1));
             end
 
@@ -152,10 +149,6 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
             Sb_temp = double(S_temp==0); % satisfied syndrome S=0 is 1
 	        num_satisfied_temp = sum(Sb_temp);
             failed_temp = M-num_satisfied_temp;
-
-           %if failed_init == 0
-            %    break;
-           %end 
 
            if failed_temp < failed_init
                 %fprintf("Updating failed_init: %d -> %d\n", failed_init, failed_temp);

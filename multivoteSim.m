@@ -1,4 +1,4 @@
--clear
+clear
 rng(0)
 
 Eb_No_db =9:0.5:11;

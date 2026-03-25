@@ -38,10 +38,10 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
 
     gf_add = @(a,b) add_mat(a+1, b+1);
     gf_mul = @(a,b) mul_mat(a+1, b+1);
-    gf_div = @(a,b) div_mat(a+1, b+1);   % assume b ~= 0 for edges
+    gf_div = @(a,b) div_mat(a+1, b+1);   
 
     while (l < T)
-         % 1) recompute syndrome for CURRENT d_gf16
+         % 1) recompute syndrome for current d_gf16
           
           S = decod_prod(d_gf16, h, CN_lst, mul_mat, add_mat); %new
           Sb = double(S==0); % satisfied syndrome S=0 is now considered as 1
@@ -60,7 +60,7 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
           %No=2*sigma^2, total noise variance in QAM16
           
 
-          E = (-abs(y - d_dec_f).^2/No) + WSH + nse_std*randn(1,N);
+          E = (-abs(y - d_dec_f).^2/No) + WSH ; %+ nse_std*randn(1,N);
 
 
           % Select most unreliable symbols, by given number flip_num
@@ -72,20 +72,20 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
                 v = idx(jj);
             
                 % votes from unsatisfied neighboring checks
-                cn_list = VN_to_CN{v}; %Find neighboring check nodes of variable node v
+                cn_list = VN_to_CN{v}; %neighboring check nodes of variable node v
                 votes = [];
             
-                %Only unsatisfied checks are allowed to vote
+                %only unsatisfied checks are allowed to vote
                 for t = 1:length(cn_list)
                     i = cn_list(t);
             
                     if S(i) == 0
-                        continue; % satisfied check gives no useful vote
+                        continue; % satisfied check gives no vote
                     end
 
-                    %Compute what symbol v should be to satisfy check i
+                    %compute what symbol v should be to satisfy check i
             
-                    % compute partial parity sum = sum_{k in N(i)\v} h(i,k)*x(k)
+                    % compute partial_parity_sum = sum_{k in N(i)\v} h(i,k)*x(k)
                     partial_sum = 0; 
                     vlist = CN_lst{i}; %all variable nodes attached to check i
             
@@ -116,8 +116,9 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
                     continue;
                 end
             
-                % pick the most common vote (mode)
-                % if tie: choose the one closest to y(v) in Euclidean distance
+                % pick the most common vote
+                % if tie then one closest to y(v) in Euclidean distance is
+                % selected
                 uniq = unique(votes);
                 counts = arrayfun(@(s) sum(votes == s), uniq);
                 maxc = max(counts);
@@ -127,7 +128,6 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
                     chosen_sym = tied_syms(1);
                 else
                     % tie-break using channel closeness to received y(v)
-                    % Need gf->qam index mapping as already built (gf_to_idx)
                     bestd = inf;
                     chosen_sym = tied_syms(1);
                     for q = 1:numel(tied_syms)
@@ -141,7 +141,7 @@ function [seqgf,failed_init,l]= decodeMultivote(code_seq, hard_d_cmplx, hard_d_g
                     end
                 end
 
-                % assign chosen symbol (convert gf element via gf16 table)
+                % assign chosen symbol (convert 0..15 -> gf element via gf16 table)
                 temp_gf16(v) = gf16(gf_to_idx(chosen_sym + 1));
             end
 

@@ -1,12 +1,12 @@
 clear
 rng(0)
 
-Eb_No_db =9:0.5:11;
+Eb_No_db =9:0.5:11.5;
 
-T=60; %max decoder iteration
+T=23; %max iteration
 
-eta=1; %.14
-w=25; %.4; %25
+eta=12; 
+w=37; 
 
 flip_num=3;
 
@@ -81,7 +81,7 @@ qam_binary_map = [ 0  0  0  0;   % -3-3j
 avg_pow = qam16'*qam16/q; %sum of squared magnitudes of all symbols(the total power)/q.
 nrm_fct=sqrt(avg_pow); %normalization factor
 gf16 = (0:q-1); %GF field symbols
-alph_bin =  logical(fliplr(dec2bin(gf16, p) - 48)); % symbols in binary
+%alph_bin =  logical(fliplr(dec2bin(gf16, p) - 48)); % symbols in binary
 
 
 FE=zeros(length(Eb_No_db),1);
@@ -97,16 +97,6 @@ targetFE=500; %maximum FER to be observed
 max_gen=1e5; % maximum number of frame to be generated
 
 for i = 1:length(Eb_No_db)
-
-    % Set the parameters based on the current Eb_N0 value
-    %dynamic adjusting of number of flips to be done
-    if Eb_No_db(i) >= 9 && Eb_No_db(i)<= 10
-       flip_num=3;      
-    elseif Eb_No_db(i) > 10 && Eb_No_db(i)<= 11
-      flip_num=3;
-    elseif Eb_No_db(i) > 11 && Eb_No_db(i)<= 14
-       flip_num=3;
-    end
 
 
      while(FE(i) < targetFE && genFrame(i)<max_gen)
@@ -174,8 +164,6 @@ for i = 1:length(Eb_No_db)
         bit_error = sum(errors_coded_bit); % no. of bit error in each frame
         %disp('biterror');
         %disp(bit_error);
-
-        
         BE_Coded(i)=BE_Coded(i)+bit_error; % total no. of bit error in total frame generated in the current Eb/No
 
         iters_cnr(i) = iters_cnr(i)+l;
@@ -200,9 +188,9 @@ for i = 1:length(Eb_No_db)
      Eb_No_db(i), FER, BER, AvgIt);
 end
 
-BERunCoded= BE_unCoded ./(genFrame * N *p); %bit error rate for uncoded
+BERunCoded= BE_unCoded ./(genFrame * K *p); %bit error rate for uncoded
 
-BERCoded = BE_Coded ./ (genFrame * N *p); %bit error rate for coded
+BERCoded = BE_Coded ./ (genFrame * K *p); %bit error rate for coded
 
 %data from ems simulation
 ems_Eb_N0=[8,8.4,9.2,9.6];
